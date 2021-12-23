@@ -12,18 +12,17 @@ import meshpy
 import sys
 import math
 import utilities
+import xy_division
 
 
 if __name__ == "__main__":
 
+    #parameters definition
     Optimal_slice_size = 20
-    Connector_grid = 7.5
     Connector_radius = 4
     Connector_height = 3
     space_between_connectors = 3.2
-    slice_limmit = 3
-    Cube_grid_x = 30
-    Cube_grid_y = 15
+
 
     
     # load the mesh from models library
@@ -95,25 +94,16 @@ if __name__ == "__main__":
 
     slices.append(full_body_2)
 
-    #slices_num = min(slice_limmit, int((bounding_box_dictionary['z_size']) / Optimal_slice_size))
-    # We first slice our body on z axis
-    #for i in range(0, slices_num):
-    #    full_body.apply_translation([0,0,-trimesh.bounds.corners(full_body.bounds)[0,2]])
-    #    slice     = inter.slice_mesh_plane(full_body, np.array([0.0, 0.0, -1.0]), np.array([0.0, 0.0, Optimal_slice_size]), cap=True)
-    #    full_body = inter.slice_mesh_plane(full_body, np.array([0.0, 0.0,  1.0]), np.array([0.0, 0.0, Optimal_slice_size]), cap=True)
-    #    if not slice.is_watertight:
-    #        print('Slicing at z failed watertight')
-    #        sys.exit(0)
-    #    slices.append(slice)
+    #the model has been sliced in the z direction
 
 
-    #build a 2d grid of centers of the connectors
+    #determine locations of potential connectors in a x-y grid
     X = list(np.arange(bounding_box_dictionary['xl'] + space_between_connectors,bounding_box_dictionary['xh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y = list(np.arange(bounding_box_dictionary['yl'] + space_between_connectors,bounding_box_dictionary['yh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y.reverse()
 
 
-    #build grid of bolts
+    #build for each location add a bolt to a grid holding all bolts
     connector = trimesh.creation.cylinder(Connector_radius, Connector_height)
     connectors = []
     for y in Y:
@@ -125,14 +115,10 @@ if __name__ == "__main__":
         connectors.append(connectors_row)
 
 
-    #scene = trimesh.Scene()
-    #for row in connectors:
-    #    for con in row:
-    #        scene.add_geometry(con)
-    #scene.add_geometry(slices[4])
-    #scene.show()
 
     #check which connectors are valid for each slice and save data in array
+    # TODO: perhaps check that a bit larger connector works for robustness
+    # TODO: raise error if slice has no voids/bolts
     connectors_validation_tensor = []
     for s in range(len(slices)-1):
         counter = 0
@@ -149,7 +135,34 @@ if __name__ == "__main__":
         connectors_validation_tensor.append(connector_2d_array)
 
 
-    #add bolts to slices
+    #plan a partition of each slice into pieces. the partition is represented by a tree
+    partition_trees = []
+    success,partition_tree,partition_layer_x,partition_layer_y = xy_division.slice_in_xy(None,connectors_validation_tensor[0],None,None)
+    if success == False:
+        print('couldnt divide slice')
+        sys.exit(0)
+    partition_trees.append(partition_tree)
+
+    for s in range(1,len(slices)-1):
+        success, partition_tree, partition_layer_x, partition_layer_y = xy_division.slice_in_xy(connectors_validation_tensor[
+                                                                                                    s-1],
+                                                                                                connectors_validation_tensor[
+                                                                                                    s], partition_layer_x, partition_layer_y)
+        if success == False:
+            print('couldnt divide slice')
+            sys.exit(0)
+        partition_trees.append(partition_tree)
+
+    success, partition_tree, partition_layer_x, partition_layer_y = xy_division.slice_in_xy(connectors_validation_tensor[
+                                                                                                    -1],
+                                                                                                None, partition_layer_x, partition_layer_y)
+    if success == False:
+        print('couldnt divide slice')
+        sys.exit(0)
+    partition_trees.append(partition_tree)
+
+
+    #add bolts to slices - TODO: perhaps make the bolts a bit smaller than the voids so they would fit in each other
     for s in range(len(slices)-1):
         slice_top_plane_height = trimesh.bounds.corners(slice.bounds)[5, 2]
         i = 0
@@ -184,72 +197,16 @@ if __name__ == "__main__":
             i += 1
 
 
+    #cut each slice according to the design made earlier
+    margin = Connector_radius + space_between_connectors/2
+    slices_to_print = []
+    for s in range(len(slices)):
+        slices_list = []
+        success = xy_division.cut(slices[s],partition_trees[s],margin,X,Y,slices_list)
+        if success == False:
+            print('couldnt slice in x,y')
+        else:
+            for t in slices_list:
+                t.show()
+            slices_to_print.append(slices_list)
 
-    # First part adding voids in each slice on our grid
-    slices_conn = []
-    for z_idx in range(0, slices_num):
-        conn_idx = 0
-        slices_conn.append(slices[z_idx].copy())
-        for x_idx in range(0, int((bounding_box_dictionary['x_size'])/Connector_grid)):
-            for y_idx in range(0, int((bounding_box_dictionary['y_size'])/Connector_grid)):
-                temp_conn  = connectors[conn_idx].copy().apply_translation([0, 0, Optimal_slice_size / 2])
-                all_inside  = not False in [x == True for x in slices[z_idx].contains(temp_conn.vertices)]
-                any_inside  = True in [x for x in slices[z_idx].contains(temp_conn.vertices)]
-                if all_inside:
-                    #Temp fix till
-                    temp = bool.boolean_automatic([slices_conn[z_idx],connectors[conn_idx]],'difference')
-                    if temp.is_watertight:
-                        slices_conn[z_idx] = temp.copy()
-                    if not slices_conn[z_idx].is_watertight:
-                        print('Adding voids failed watertight')
-                        sys.exit(0)
-                conn_idx += 2
-
-    # Second part adding bolts in each slice on our grid
-    for z_idx in range(0, slices_num):
-        conn_idx = 0
-        for x_idx in range(0, int((bounding_box_dictionary['x_size'])/Connector_grid)):
-            for y_idx in range(0, int((bounding_box_dictionary['y_size'])/Connector_grid)):
-                temp_conn = connectors[conn_idx].copy().apply_translation([0, 0, Optimal_slice_size / 2])
-                all_inside = not False in [x == True for x in slices[z_idx].contains(temp_conn.vertices)]
-                any_inside = True in [x  for x in slices[z_idx].contains(temp_conn.vertices)]
-                if all_inside:
-                    slices_conn[z_idx] = trimesh.util.concatenate([slices_conn[z_idx],connectors[conn_idx+1]])
-                    if not slices_conn[z_idx].is_watertight:
-                        print('Adding bolts failed watertight')
-                        sys.exit(0)
-                conn_idx += 2
-
-    # Sanity check see cross section of voids and bolts in slice 0
-    for z_idx in range(0, slices_num):
-        slice = slices_conn[z_idx].section(plane_origin=[0,0,0.2],plane_normal=[0,0,1])
-        slice.show()
-        slice = slices_conn[z_idx].section(plane_origin=[0, 0, Optimal_slice_size + 0.2], plane_normal=[0, 0, 1])
-        slice.show()
-
-    # First slicing over x axis
-    slices_x_cut = []
-    for z_idx in range(0, slices_num):
-        current_slice = slices_conn[z_idx]
-        current_x_low  = trimesh.bounds.corners(current_slice.bounds)[0,0]
-        current_x_high = trimesh.bounds.corners(current_slice.bounds)[1,0]
-        for x_idx in range(0,int((current_x_high-current_x_low)/Cube_grid_x)):
-            current_slice.apply_translation([-trimesh.bounds.corners(current_slice.bounds)[0,0], 0, 0])
-            slice         = inter.slice_mesh_plane(current_slice,np.array([-1.0, 0.0, 0.0]),np.array([Cube_grid_x, 0.0, 0.0]),cap=True)
-            current_slice = inter.slice_mesh_plane(current_slice,np.array([ 1.0, 0.0, 0.0]),np.array([Cube_grid_x, 0.0, 0.0]),cap=True)
-            slices_x_cut.append(slice)
-
-    # Second slice over y axis
-    slices_y_cut = []
-    for x_idx in range(0, len(slices_x_cut)):
-        current_slice = slices_x_cut[x_idx]
-        current_y_low  = trimesh.bounds.corners(current_slice.bounds)[0,1]
-        current_y_high = trimesh.bounds.corners(current_slice.bounds)[2,1]
-        for y_idx in range(0,int((current_y_high-current_y_low)/Cube_grid_y)):
-            current_slice.apply_translation([0, -trimesh.bounds.corners(current_slice.bounds)[0,1], 0])
-            slice         = inter.slice_mesh_plane(current_slice,np.array([0.0, -1.0, 0.0]),np.array([0.0, Cube_grid_y, 0.0]),cap=True)
-            current_slice = inter.slice_mesh_plane(current_slice,np.array([0.0,  1.0, 0.0]),np.array([0.0, Cube_grid_y, 0.0]),cap=True)
-            slices_y_cut.append(slice)
-
-    i = 3
-    #slices_y_cut[3].show(flags={'wireframe': True, 'axis': True})

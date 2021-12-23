@@ -49,10 +49,6 @@ def is_slicing_valid(former_plane_2d,potential_plane_2d,height_differences):
 def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
     epsilon = 0.01
     copy_connector = connector.copy()
-    #scene = trimesh.Scene()
-    #scene.add_geometry(copy_connector)
-    #scene.add_geometry(slice_bottom)
-    #scene.show()
     #first check if the connector is on the top plane of the slice
     z_coordinate = trimesh.bounds.corners(slice_bottom.bounds)[5, 2] - epsilon
     center_of_circle = copy_connector.centroid
@@ -71,10 +67,6 @@ def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
 
     #now check if the connector is inside the top slice
     copy_connector.apply_translation([0,0,-trimesh.bounds.corners(copy_connector.bounds)[3,2] + trimesh.bounds.corners(slice_top.bounds)[3,2] + epsilon])
-    #scene = trimesh.Scene()
-    #scene.add_geometry(copy_connector)
-    #scene.add_geometry(slice_top)
-    #scene.show()
     second_cond = slice_top.contains(copy_connector.vertices)
     if False in second_cond:
         return False
