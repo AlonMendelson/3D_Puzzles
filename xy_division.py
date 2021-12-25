@@ -230,24 +230,6 @@ def compute_layer_partitions_from_tree(partition_tree,layer_partition_x,layer_pa
     return layer_partition_x, layer_partition_y
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def slice_in_xy(voids_matrix,bolts_matrix,previous_layer_partition_x,previous_layer_partition_y):
 
 
@@ -284,10 +266,6 @@ def slice_in_xy(voids_matrix,bolts_matrix,previous_layer_partition_x,previous_la
     current_layer_partition_x,current_layer_partition_y = compute_layer_partitions_from_tree(partition_tree,current_layer_partition_x,current_layer_partition_y)
 
 
-
-
-
-
     return success, partition_tree,current_layer_partition_x,current_layer_partition_y
 
 
@@ -314,7 +292,8 @@ def cut(slice,partition_tree,margin,X,Y,slices_list):
                                    cap=True)
 
     if (first.is_watertight == False or second.is_watertight == False):
-        return False
+        if(first.fill_holes() == False or second.fill_holes == False):
+            return False
 
     success1 = cut(first,partition_tree.first,margin,X,Y,slices_list)
     success2 = cut(second,partition_tree.second,margin,X,Y,slices_list)

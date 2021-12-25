@@ -13,12 +13,13 @@ import sys
 import math
 
 def mesh_bounding_box(mesh):
-    xl  = trimesh.bounds.corners(mesh.bounds)[0,0]
-    xh = trimesh.bounds.corners(mesh.bounds)[1,0]
-    yh = trimesh.bounds.corners(mesh.bounds)[2,1]
-    zl = trimesh.bounds.corners(mesh.bounds)[3,2]
-    yl = trimesh.bounds.corners(mesh.bounds)[4,1]
-    zh = trimesh.bounds.corners(mesh.bounds)[5, 2]
+    bounds = mesh.bounds
+    xl  = bounds[0,0]
+    xh = bounds[1,0]
+    yh = bounds[1,1]
+    zl = bounds[0,2]
+    yl = bounds[0,1]
+    zh = bounds[1,2]
     x_size = xh - xl
     y_size = yh - yl
     z_size = zh - zl
@@ -35,22 +36,17 @@ def create_list_of_possible_slice_sizes(Optimal_slice_size):
     return Possible_slice_sizes
 
 def is_slicing_valid(former_plane_2d,potential_plane_2d,height_differences):
-    if(potential_plane_2d.area < 30):
+    if(potential_plane_2d.area < 100):
         return False
     if(potential_plane_2d.body_count > 1):
         return False
-    #if (former_plane_2d != None):
-    #    incline_angle = np.arctan((height_differences*np.sqrt(np.pi))/(np.sqrt(former_plane_2d.area)-np.sqrt(potential_plane_2d.area)))
-    #    if (incline_angle < np.pi/3 and incline_angle > 0):
-    #        return False
-
     return True
 
 def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
     epsilon = 0.01
     copy_connector = connector.copy()
     #first check if the connector is on the top plane of the slice
-    z_coordinate = trimesh.bounds.corners(slice_bottom.bounds)[5, 2] - epsilon
+    z_coordinate = slice_bottom.bounds[1,2] - epsilon
     center_of_circle = copy_connector.centroid
     angle_samples = np.linspace(0.0,2*np.pi,50)
     first_cond = True
@@ -66,7 +62,7 @@ def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
 
 
     #now check if the connector is inside the top slice
-    copy_connector.apply_translation([0,0,-trimesh.bounds.corners(copy_connector.bounds)[3,2] + trimesh.bounds.corners(slice_top.bounds)[3,2] + epsilon])
+    copy_connector.apply_translation([0,0,-copy_connector.bounds[0,2] + slice_top.bounds[0,2] + epsilon])
     second_cond = slice_top.contains(copy_connector.vertices)
     if False in second_cond:
         return False
@@ -75,15 +71,21 @@ def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
 def add_bolt_to_slice(bolt,slice,top_plane_height):
     bolt_copy = bolt.copy()
     bolt_copy.apply_translation([0,0,top_plane_height])
-    slice = bool.boolean_automatic([slice, bolt_copy], 'union')
+    new_bolt = trimesh.creation.cylinder(3.9,3)
+    new_bolt.apply_translation(bolt_copy.centroid)
+    slice = bool.union([slice, new_bolt], 'scad')
     if slice.is_watertight == False:
-        return None
+        worked = slice.fill_holes()
+        if worked == False:
+            return None
     return slice
 
 def add_void_to_slice(bolt,slice,bottom_plane_height):
     bolt_copy = bolt.copy()
     bolt_copy.apply_translation([0,0,bottom_plane_height])
-    slice = bool.boolean_automatic([slice, bolt_copy], 'difference')
+    slice = bool.difference([slice, bolt_copy], 'scad')
     if slice.is_watertight == False:
-        return None
+        worked = slice.fill_holes()
+        if worked == False:
+            return None
     return slice

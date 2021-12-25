@@ -55,7 +55,7 @@ if __name__ == "__main__":
     while(height_of_remaining_body > Optimal_slice_size):
 
         #translate the mesh to stand on z=0
-        full_body_2.apply_translation([0, 0, -trimesh.bounds.corners(full_body_2.bounds)[0, 2]])
+        full_body_2.apply_translation([0, 0, -full_body_2.bounds[0,2]])
 
         #try a single slice
         slice_valid = False
@@ -92,7 +92,18 @@ if __name__ == "__main__":
         else:
             break
 
-    slices.append(full_body_2)
+    #take care of remainding layer if exists
+    if(utilities.mesh_bounding_box(full_body_2)['z_size'] > 10):
+        slices.append(full_body_2)
+    else:
+        slices[-1] = bool.union([slices[-1],full_body_2],'scad')
+        if slices[-1].is_watertight == False:
+            if slices[-1].fill_holes() == False:
+                print('Slicing at z failed watertight')
+                sys.exit(0)
+
+
+
 
     #the model has been sliced in the z direction
 
@@ -162,9 +173,9 @@ if __name__ == "__main__":
     partition_trees.append(partition_tree)
 
 
-    #add bolts to slices - TODO: perhaps make the bolts a bit smaller than the voids so they would fit in each other
+    #add bolts to slices
     for s in range(len(slices)-1):
-        slice_top_plane_height = trimesh.bounds.corners(slice.bounds)[5, 2]
+        slice_top_plane_height = slices[s].bounds[1,2]
         i = 0
         for connectors_row in connectors:
             j = 0
@@ -182,7 +193,7 @@ if __name__ == "__main__":
 
         # add voids to slices
     for s in range(len(slices) - 1):
-        slice_bottom_plane_height = trimesh.bounds.corners(slice.bounds)[3, 2]
+        slice_bottom_plane_height = slices[s].bounds[0,2]
         i = 0
         for connectors_row in connectors:
             j = 0
@@ -206,7 +217,12 @@ if __name__ == "__main__":
         if success == False:
             print('couldnt slice in x,y')
         else:
-            for t in slices_list:
-                t.show()
             slices_to_print.append(slices_list)
+
+
+    for slice in range(len(slices_to_print)):
+        parts = slices_to_print[slice]
+        for part in range(len(parts)):
+            partname = 'slice_'+str(slice)+'_part_'+str(part)
+            parts[part].export("puzzle_parts/"+partname+".stl")
 
