@@ -13,20 +13,23 @@ import sys
 import math
 import utilities
 import xy_division
+import argparse
+import os.path
+from os import path
 
 
-if __name__ == "__main__":
+def create_puzzle(args):
 
     #parameters definition
     Optimal_slice_size = 20
     Connector_radius = 4
-    Connector_height = 3
+    Connector_height = 3.5
     space_between_connectors = 3.2
 
 
     
     # load the mesh from models library
-    full_body = trimesh.load_mesh('models/Bunny-LowPoly.stl')
+    full_body = trimesh.load_mesh('models/' + args.input_model + '.stl')
 
     #get a dictionary with sizes of the bounding box of the mesh
     bounding_box_dictionary = utilities.mesh_bounding_box(full_body)
@@ -223,6 +226,37 @@ if __name__ == "__main__":
     for slice in range(len(slices_to_print)):
         parts = slices_to_print[slice]
         for part in range(len(parts)):
-            partname = 'slice_'+str(slice)+'_part_'+str(part)
-            parts[part].export("puzzle_parts/"+partname+".stl")
+            partname = args.input_model + '_slice_'+str(slice)+'_part_'+str(part)
+            parts[part].export(args.output_dir + "/"+partname+".stl")
 
+    print("puzzle created successfully")
+
+
+def main():
+    args = sys.argv[1:]
+
+    parser = argparse.ArgumentParser(description='Creates a 3D puzzle')
+
+    parser.add_argument('input_model',  type=str,
+                                help="name of model")
+    parser.add_argument('output_dir', type=str, help="output directory")
+
+    args = parser.parse_args(args)
+
+    model_path = 'models/' + args.input_model + '.stl'
+    output_path = args.output_dir
+
+    if path.exists(model_path) == False:
+        print('model file doesnt exist')
+        sys.exit(1)
+
+    if path.exists(output_path) == False:
+        os.mkdir(output_path)
+
+
+    create_puzzle(args)
+
+
+
+if __name__ == "__main__":
+    main()
