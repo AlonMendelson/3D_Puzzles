@@ -69,10 +69,10 @@ def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
     return True
 
 def add_bolt_to_slice(bolt,slice,top_plane_height):
-    bolt_copy = bolt.copy()
-    bolt_copy.apply_translation([0,0,top_plane_height])
-    new_bolt = trimesh.creation.cylinder(3.9,3)
-    new_bolt.apply_translation(bolt_copy.centroid)
+    coordinates = bolt.centroid.copy()
+    coordinates[2] = top_plane_height + 1.5
+    new_bolt = trimesh.creation.cylinder(3.6,3)
+    new_bolt.apply_translation(coordinates)
     slice = bool.union([slice, new_bolt], 'scad')
     if slice.is_watertight == False:
         worked = slice.fill_holes()
