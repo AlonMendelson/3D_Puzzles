@@ -26,8 +26,6 @@ def create_puzzle(args):
     Connector_height = 3.5
     space_between_connectors = 3.2
 
-
-    
     # load the mesh from models library
     full_body = trimesh.load_mesh('models/' + args.input_model + '.stl')
 
@@ -70,7 +68,7 @@ def create_puzzle(args):
             #transfer to 2d
             cs_2d,_ = cs_3d.to_planar()
             #check slicing validity
-            slice_valid = utilities.is_slicing_valid(former_slice, cs_2d, height_difference)
+            slice_valid = utilities.is_slicing_valid(former_slice, cs_2d, height_difference,Connector_radius,space_between_connectors)
             if(slice_valid):
                 former_slice = cs_2d
             else:
@@ -97,6 +95,7 @@ def create_puzzle(args):
 
     #take care of remainding layer if exists
     if(utilities.mesh_bounding_box(full_body_2)['z_size'] > 10):
+        full_body_2.apply_translation([0, 0, -full_body_2.bounds[0, 2]])
         slices.append(full_body_2)
     else:
         slices[-1] = bool.union([slices[-1],full_body_2],'scad')
@@ -105,19 +104,13 @@ def create_puzzle(args):
                 print('Slicing at z failed watertight')
                 sys.exit(0)
 
-
-
-
     #the model has been sliced in the z direction
-
-
     #determine locations of potential connectors in a x-y grid
     X = list(np.arange(bounding_box_dictionary['xl'] + space_between_connectors,bounding_box_dictionary['xh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y = list(np.arange(bounding_box_dictionary['yl'] + space_between_connectors,bounding_box_dictionary['yh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y.reverse()
 
-
-    #build for each location add a bolt to a grid holding all bolts
+    #for each location add a bolt to a grid holding all bolts
     connector = trimesh.creation.cylinder(Connector_radius, Connector_height)
     connectors = []
     for y in Y:
@@ -128,11 +121,7 @@ def create_puzzle(args):
             connectors_row.append(connector_copy)
         connectors.append(connectors_row)
 
-
-
     #check which connectors are valid for each slice and save data in array
-    # TODO: perhaps check that a bit larger connector works for robustness
-    # TODO: raise error if slice has no voids/bolts
     connectors_validation_tensor = []
     for s in range(len(slices)-1):
         counter = 0
@@ -146,8 +135,10 @@ def create_puzzle(args):
                 else:
                     connector_1d_array.append(False)
             connector_2d_array.append(connector_1d_array)
+        if counter == 0:
+            print('puzzle creation failed')
+            sys.exit(0)
         connectors_validation_tensor.append(connector_2d_array)
-
 
     #plan a partition of each slice into pieces. the partition is represented by a tree
     partition_trees = []
@@ -210,7 +201,6 @@ def create_puzzle(args):
                 j += 1
             i += 1
 
-
     #cut each slice according to the design made earlier
     margin = Connector_radius + space_between_connectors/2
     slices_to_print = []
@@ -221,7 +211,6 @@ def create_puzzle(args):
             print('couldnt slice in x,y')
         else:
             slices_to_print.append(slices_list)
-
 
     for slice in range(len(slices_to_print)):
         parts = slices_to_print[slice]
@@ -234,29 +223,19 @@ def create_puzzle(args):
 
 def main():
     args = sys.argv[1:]
-
     parser = argparse.ArgumentParser(description='Creates a 3D puzzle')
-
     parser.add_argument('input_model',  type=str,
                                 help="name of model")
     parser.add_argument('output_dir', type=str, help="output directory")
-
     args = parser.parse_args(args)
-
     model_path = 'models/' + args.input_model + '.stl'
     output_path = args.output_dir
-
     if path.exists(model_path) == False:
         print('model file doesnt exist')
         sys.exit(1)
-
     if path.exists(output_path) == False:
         os.mkdir(output_path)
-
-
     create_puzzle(args)
-
-
 
 if __name__ == "__main__":
     main()

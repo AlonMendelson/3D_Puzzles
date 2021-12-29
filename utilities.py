@@ -28,15 +28,17 @@ def mesh_bounding_box(mesh):
     return bounding_box_dictionray
 
 def create_list_of_possible_slice_sizes(Optimal_slice_size):
-    list1 = [Optimal_slice_size]
     list2 = [i for i in range(Optimal_slice_size//2,Optimal_slice_size)]
     list2.reverse()
     list3 = [i for i in range(Optimal_slice_size + 1, Optimal_slice_size + 1 + Optimal_slice_size//2)]
-    Possible_slice_sizes = [Optimal_slice_size] + list2 + list3
+    Possible_slice_sizes = [None]*(len(list2)+len(list3))
+    Possible_slice_sizes[::2] = list2
+    Possible_slice_sizes[1::2] = list3
+    Possible_slice_sizes = [Optimal_slice_size] + Possible_slice_sizes
     return Possible_slice_sizes
 
-def is_slicing_valid(former_plane_2d,potential_plane_2d,height_differences):
-    if(potential_plane_2d.area < 100):
+def is_slicing_valid(former_plane_2d,potential_plane_2d,height_differences,radius,margin):
+    if(potential_plane_2d.area < (2*radius + 2*margin)*(2*radius + margin)):
         return False
     if(potential_plane_2d.body_count > 1):
         return False

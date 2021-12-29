@@ -231,8 +231,6 @@ def compute_layer_partitions_from_tree(partition_tree,layer_partition_x,layer_pa
 
 
 def slice_in_xy(voids_matrix,bolts_matrix,previous_layer_partition_x,previous_layer_partition_y):
-
-
     #get borders of the voids and bolts arrays
     if(voids_matrix is None):
         voids_borders = None
@@ -258,7 +256,11 @@ def slice_in_xy(voids_matrix,bolts_matrix,previous_layer_partition_x,previous_la
                    'x_left': min(voids_borders['x_left'],bolts_borders['x_left']),
                    'x_right':max(voids_borders['x_right'],bolts_borders['x_right'])}
 
-    success, partition_tree = do_partition(voids_array, bolts_array,borders,previous_layer_partition_x,previous_layer_partition_y)
+    if(np.count_nonzero(voids_array) == 1 or np.count_nonzero(bolts_array) == 1):
+        success = True
+        partition_tree = partition({'axis': None, 'x': None, 'y':None})
+    else:
+        success, partition_tree = do_partition(voids_array, bolts_array,borders,previous_layer_partition_x,previous_layer_partition_y)
 
     current_layer_partition_x = np.zeros(bolts_array.shape if voids_array is None else voids_array.shape)
     current_layer_partition_y = np.zeros(bolts_array.shape if voids_array is None else voids_array.shape)
