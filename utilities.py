@@ -70,10 +70,10 @@ def is_connector_valid(connector, slice_bottom, slice_top, connector_radius):
         return False
     return True
 
-def add_bolt_to_slice(bolt,slice,top_plane_height):
+def add_bolt_to_slice(bolt,slice,top_plane_height, connector_height,connector_radius):
     coordinates = bolt.centroid.copy()
-    coordinates[2] = top_plane_height + 1.5
-    new_bolt = trimesh.creation.cylinder(3.6,3)
+    coordinates[2] = top_plane_height + connector_height/2
+    new_bolt = trimesh.creation.cylinder(connector_radius - 0.4,connector_height)
     new_bolt.apply_translation(coordinates)
     slice = bool.union([slice, new_bolt], 'scad')
     if slice.is_watertight == False:

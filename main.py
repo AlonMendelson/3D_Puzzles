@@ -23,7 +23,7 @@ def create_puzzle(args):
     #parameters definition
     Optimal_slice_size = 20
     Connector_radius = 4
-    Connector_height = 3.5
+    Connector_height = 3
     space_between_connectors = 3.2
 
     # load the mesh from models library
@@ -175,7 +175,7 @@ def create_puzzle(args):
             j = 0
             for connector in connectors_row:
                 if connectors_validation_tensor[s][i][j] == True:
-                    new_slice = utilities.add_bolt_to_slice(connector,slices[s],slice_top_plane_height)
+                    new_slice = utilities.add_bolt_to_slice(connector,slices[s],slice_top_plane_height,Connector_height,Connector_radius)
                     if new_slice == None:
                         print('couldnt add bolt')
                     else:
