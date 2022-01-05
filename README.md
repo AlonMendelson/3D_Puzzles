@@ -10,7 +10,7 @@ We designed & implemented an algorithm that turns a 3D model into pieces of puzz
 ```
 python main.py Bunny outputs
 ```
-This creates a puzzle from the Bunny.stl file from the models folder and saves the results to folder outputs within the repository
+This creates a puzzle from the Bunny.stl file from the models folder and saves the results to folder outputs within the repository\
 Note: runtime can be several minutes since boolean operations are slow
 ## Extra materials
 See the Results folder for stl files of puzzle pieces for different models as well as pictures of assembled puzzles that we printed
