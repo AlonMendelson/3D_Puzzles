@@ -13,6 +13,7 @@ import sys
 import math
 import utilities
 import xy_division
+import strengh_testing
 import argparse
 import os.path
 from os import path
@@ -25,9 +26,16 @@ def create_puzzle(args):
     Connector_radius = 4
     Connector_height = 3
     space_between_connectors = 3.2
+    Density = 1.4/1000 #for PLA translated to gr/mm^3
+    Fill_ratio = 0.1 #infill ratio of 3D printer
+    Fill_overhead = 3 #constant after measurements of infill overhead from slicing
+    Knn = 3 #how many bolts to take into consideration when testing strength
+    Maximum_moment = 1 #N*m according to our experiment
 
     # load the mesh from models library
     full_body = trimesh.load_mesh('models/' + args.input_model + '.stl')
+
+    full_body.density = Density * Fill_ratio * Fill_overhead
 
     #get a dictionary with sizes of the bounding box of the mesh
     bounding_box_dictionary = utilities.mesh_bounding_box(full_body)
@@ -37,6 +45,9 @@ def create_puzzle(args):
 
     #create a list of slices along the z direction
     slices=[]
+
+    #center_of_masses_above_slice
+    COM_above_slice = []
 
     #create a list of cross sections of the slices
     cross_sections = []
@@ -51,6 +62,8 @@ def create_puzzle(args):
 
     #create a copy of the mesh
     full_body_2 = full_body.copy(include_cache=False)
+
+    full_body_2.density = full_body.density
 
     #start slicing in z direction
     while(height_of_remaining_body > Optimal_slice_size):
@@ -79,12 +92,16 @@ def create_puzzle(args):
         if slice_valid:
             slice = inter.slice_mesh_plane(full_body_2, np.array([0.0, 0.0, -1.0]), np.array([0.0, 0.0, height_difference]),
                                        cap=True)
+            slice.density = full_body_2.density
             full_body_2 = inter.slice_mesh_plane(full_body_2, np.array([0.0, 0.0, 1.0]),
                                            np.array([0.0, 0.0, height_difference]),
                                            cap=True)
+            full_body_2.density = slice.density
+            COM_above_slice.append(strengh_testing.is_COM_in_bottom_mesh(full_body_2,slice))
             if(slice.is_watertight == False or full_body_2.is_watertight == False):
                 print('Slicing at z failed watertight')
                 sys.exit(0)
+
             slices.append(slice)
             cross_sections.append(former_slice)
             height_of_remaining_body -= height_difference
@@ -109,6 +126,7 @@ def create_puzzle(args):
     X = list(np.arange(bounding_box_dictionary['xl'] + space_between_connectors,bounding_box_dictionary['xh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y = list(np.arange(bounding_box_dictionary['yl'] + space_between_connectors,bounding_box_dictionary['yh'] - space_between_connectors,space_between_connectors + 2 * Connector_radius))
     Y.reverse()
+
 
     #for each location add a bolt to a grid holding all bolts
     connector = trimesh.creation.cylinder(Connector_radius, Connector_height)
@@ -139,6 +157,12 @@ def create_puzzle(args):
             print('puzzle creation failed')
             sys.exit(0)
         connectors_validation_tensor.append(connector_2d_array)
+
+    moments = []
+    #strength_testing
+    for i in range(len(slices)-1):
+        moment = strengh_testing.strengh_test(COM_above_slice[i],X,Y,connectors_validation_tensor[i],Knn)
+        moments.append((moment,moment>Maximum_moment))
 
     #plan a partition of each slice into pieces. the partition is represented by a tree
     partition_trees = []
@@ -218,8 +242,12 @@ def create_puzzle(args):
             partname = args.input_model + '_slice_'+str(slice)+'_part_'+str(part)
             parts[part].export(args.output_dir + "/"+partname+".stl")
 
-    print("puzzle created successfully")
 
+    for i in range(len(slices) - 1):
+        if(moments[i][1]):
+            print('Warning: the moment on slice ' + str(i) + ' is above limit. Consider printing parts for this slice with extended shells/infill' )
+
+    print("puzzle created successfully")
 
 def main():
     args = sys.argv[1:]
